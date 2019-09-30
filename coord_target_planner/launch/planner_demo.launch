@@ -1,0 +1,18 @@
+<launch>
+    <arg name="map_file" default=""/>
+
+    <!-- Map server -->
+    <!--node pkg="map_server" name="map_server" type="map_server" args="$(arg map_file)"/ -->
+
+    <!-- AMCL -->
+    <!--include file="$(find turtlebot3_navigation)/launch/amcl.launch"/-->
+
+    <node pkg="coord_target_planner" name="plan_demo" type="planner_demo_node" output="screen"
+          launch-prefix="xterm -e gdb -ex gdb --args ">
+        <!--rosparam file="$(find turtlebot3_navigation)/param/costmap_common_params_waffle_pi.yaml" command="load" ns="global_costmap" /-->
+        <!--rosparam file="$(find turtlebot3_navigation)/param/global_costmap_params.yaml" command="load" /-->
+        <rosparam file="$(find turtlebot3_navigation)/param/costmap_common_params_waffle_pi.yaml" command="load" ns="global_costmap" />
+        <rosparam file="$(find turtlebot3_navigation)/param/global_costmap_params.yaml" command="load" />
+        <rosparam file="$(find coord_target_planner)/param/planner_demo_params.yaml" command="load" />
+    </node>
+</launch>

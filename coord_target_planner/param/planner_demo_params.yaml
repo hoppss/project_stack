@@ -1,0 +1,7 @@
+CoordTargetPlannerROS:
+  angle_smooth_win: 1
+
+  size_x: 3
+  size_y: 3
+  middle_rate: 0.5
+  traj_points_num: 10

@@ -1,0 +1,14 @@
+<launch>
+	<arg name="depth_image" default="/camera/depth_registered/image_raw"/>
+	<arg name="rgb_image" default="/camera/rgb/image_raw"/>
+	<arg name="map" default="/home/robotfollower/catkin_ws/src/my_turtlebot_teleop/map/mymap.yaml"/>
+	<include file="$(find turtlebot_bringup)/launch/minimal.launch"/>
+	<include file="$(find turtlebot_navigation)/launch/amcl_demo.launch">
+		<arg name="map_file" value="$(arg map)"/>
+	</include>
+	<!--include file="$(find freenect_launch)/launch/examples/freenect-registered-xyzrgb.launch"/-->
+    <include file="$(find rosbridge_server)/launch/rosbridge_udp.launch" ns="rosbridge_udp"/>
+    <include file="$(find rosbridge_server)/launch/rosbridge_tcp.launch" ns="rosbridge_tcp"/>
+    <node pkg="web_video_server" type="web_video_server" name="web_video_server"/>
+</launch>
+

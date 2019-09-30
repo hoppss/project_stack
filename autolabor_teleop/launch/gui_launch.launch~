@@ -1,0 +1,9 @@
+<launch>
+
+  <node pkg="my_turtlebot_teleop" type="gui_control_server.py" name="gui_control" output="screen">
+    <param name="scale_linear" value="0.1" type="double"/>
+    <param name="scale_angular" value="0.4" type="double"/>
+    <remap from="gui_control/cmd_vel" to="cmd_vel" />
+  </node>
+  
+</launch>

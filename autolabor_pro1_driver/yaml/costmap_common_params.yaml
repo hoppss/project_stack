@@ -1,0 +1,10 @@
+# localmap和globalmap共同的配置
+obstacle_range: 2.5  # 只更新机器人半径周围2.5m的障碍物
+raytrace_range: 3.0  # 根据传感器信息清除5cm内可通行区域
+footprint: [[0.363, 0.287], [0.363, -0.287], [-0.363, -0.287], [-0.363, 0.287]]  # 机器人的footprint, 周围轮廓顺时针
+#robot_radius: ir_of_robot
+inflation_radius: 0.3  # 膨胀系数
+
+observation_sources: laser_scan_sensor  # 观测源
+
+laser_scan_sensor: {sensor_frame: laser, data_type: LaserScan, topic: /scan, marking: true, clearing: true}

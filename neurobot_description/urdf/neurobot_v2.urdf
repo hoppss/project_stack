@@ -1,0 +1,46 @@
+<robot name="neurobot_description">
+  <link name="base_link">
+    <visual>
+      <origin
+        xyz="-0.363 0.3085 0.2883"
+        rpy="0. 1.57 -1.57" />
+      <geometry>
+        <mesh
+          filename="package://neurobot_description/meshes/neurobot.stl" scale="0.001 0.001 0.001"/>
+      </geometry>
+      <material
+        name="">
+        <color
+          rgba="0.8 0.8 0.8 1" />
+      </material>
+    </visual>
+  </link>
+
+  <link name="laser">
+  </link>
+
+  <link name="imu">
+  </link>Core
+
+  <link name="vo">
+  </link>
+
+  <joint name="laser_joint" type="fixed">
+    <parent link="base_link"/>
+    <child link="laser"/>
+    <origin rpy="0 0 0" xyz="0.326 0 0"/>
+  </joint>
+
+  <joint name="imu_joint" type="fixed">
+    <parent link="base_link"/>
+    <child link="imu"/>
+    <!-- <origin rpy="0 0 0" xyz="-0.2 -0.285 0"/> -->
+    <origin rpy="0 0 -1.57" xyz="-0.22 -0.335 0"/>
+  </joint>
+
+  <joint name="gps_joint" type="fixed">
+    <parent link="base_link"/>
+    <child link="vo"/>
+    <origin rpy="0 0 0" xyz="0.246 0 0"/>
+  </joint>
+</robot>

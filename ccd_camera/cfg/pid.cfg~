@@ -1,0 +1,14 @@
+#!/usr/bin/env python
+PACKAGE = "ccd_camera"
+
+from dynamic_reconfigure.parameter_generator_catkin import *
+import math
+
+gen = ParameterGenerator()
+
+gen.add("Kp",    double_t,    0, "Distance Kp", 0.005,  0, 0.01)
+gen.add("Ki",    double_t,    0, "Distance Ki", 0.0,  0, 0.01)
+gen.add("Kd",    double_t,    0, "Distance Kd", 0,  0, 10)
+gen.add("LinearX",    double_t,    0, "Distance Integral Discrete", 0.05,  0, 1)
+
+exit(gen.generate(PACKAGE, "ccd_camera", "pid_"))

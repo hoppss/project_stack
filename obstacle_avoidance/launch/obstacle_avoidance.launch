@@ -1,0 +1,16 @@
+<launch>
+    <arg name="cmd_vel_topic" default="/cmd_vel"/>
+    <arg name="odom_topic" default="/odom"/>
+    <arg name="use_noise" default="false"/>
+
+    <node pkg="obstacle_avoidance" type="obstacle_avoidance_node" name="obstacle_avoidance" output="screen" >
+<!--        launch-prefix="xterm -e gdb -ex gdb &#45;&#45;args ">-->
+        <param name="is_noise" value="$(arg use_noise)"/>
+        <param name="base_local_planner" value="dwa_local_planner/DWAPlannerROS"/>
+        <rosparam file="$(find obstacle_avoidance)/param/move_base_params.yaml" command="load"/>
+        <rosparam file="$(find obstacle_avoidance)/param/costmap_common_params.yaml" command="load" ns="local_costmap"/>
+        <rosparam file="$(find obstacle_avoidance)/param/local_costmap_params.yaml" command="load"/>
+        <rosparam file="$(find obstacle_avoidance)/param/dwa_local_planner_params.yaml" command="load"/>
+        <rosparam file="$(find obstacle_avoidance)/param/rolling_window_params.yaml" command="load"/>
+    </node>
+</launch>

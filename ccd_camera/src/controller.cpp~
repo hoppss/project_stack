@@ -1,0 +1,37 @@
+#include "controller.h"
+
+Controller::Controller(float fkp, float fKi, float fKd):
+    mfKp(fkp), mfKi(fKi), mfKd(fKd), mfErrLast1(0), mfErrLast2(0), mfOutputLast(0)
+{
+}
+
+
+float Controller::output(float fError)
+{
+    // float fdOutput = mfKp*(fError-mfErrLast1) + mfKi*fError + mfKd*(fError-2*mfErrLast1+mfErrLast2);
+    // float fCurrOutput = fdOutput + mfOutputLast;
+    // mfOutputLast = fCurrOutput;
+    // mfErrLast2 = mfErrLast1;
+    // mfErrLast1 = fError;
+    // return fCurrOutput;
+	ROS_INFO("Current output: %f" % fError*mfKp);
+	return fError*mfKp;
+}
+
+
+void Controller::setKp(float fKp)
+{
+    mfKp = fKp;
+}
+
+
+void Controller::setKi(float fKi)
+{
+    mfKi = fKi;
+}
+
+
+void Controller::setKd(float fKd)
+{
+    mfKd = fKd;
+}

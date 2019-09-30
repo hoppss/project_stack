@@ -1,0 +1,76 @@
+//
+// Created by yonghui on 19-4-19.
+//
+
+#include <cmath>
+#include <string>
+#include <ros/ros.h>
+#include <ros/param.h>
+#include <dynamic_reconfigure/server.h>
+#include <ccd_camera/pid_Config.h>
+#include <geometry_msgs/Twist.h>
+#include "ccd_camera_serial.h"
+#include "controller.h"
+using namespace std;
+
+void config_callback(ccd_camera::pid_Config &config, uint32_t level, Controller &clt, float &fLinearX)
+{
+    clt.setKp(config.Kp);
+    clt.setKi(config.Ki);
+    clt.setKd(config.Kd);
+    fLinearX = config.LinearX;
+    ros::param::set("~Kp", config.Kp);
+    ros::param::set("~Ki", config.Ki);
+    ros::param::set("~Kd", config.Kd);
+    ros::param::set("~linear_x", config.LinearX);
+    ROS_INFO("Kp: %f, Ki %f, Kd %f , LinearX %f", config.Kp, config.Ki, config.Kd, config.LinearX);
+}
+
+int main(int argc, char **argv)
+{
+    ros::init(argc, argv, "ccd_camera_node");
+    ros::NodeHandle nh;
+    string strPortName;
+    int nMidPos;
+    float fKp;
+    float fKi;
+    float fKd;
+    float fXCmdVel;
+    ros::param::get("~port", strPortName);
+    ros::param::get("~mid_pos", nMidPos);
+    ros::param::get("~Kp", fKp);
+    ros::param::get("~Ki", fKi);
+    ros::param::get("~Kd", fKd);
+    ros::param::get("~linear_x", fXCmdVel);
+    CCDCameraSerial serialler(strPortName.c_str());
+    if (!serialler.isPortOpen())
+    {
+        return -1;
+    }
+    Controller clt(fKp, fKi, fKd);
+    dynamic_reconfigure::Server<ccd_camera::pid_Config> server;
+    dynamic_reconfigure::Server<ccd_camera::pid_Config>::CallbackType f;
+    f = boost::bind(&config_callback, _1, _2, clt, fXCmdVel);
+    server.setCallback(f);
+    ros::Publisher pubCmdVel = nh.advertise<geometry_msgs::Twist>("/cmd_vel", 10);
+//    ros::Rate loop_rate(100);
+    while (ros::ok())
+    {
+        int nCurrPos = serialler.recv_buffer();
+		if (nCurrPos >= 0)
+		{
+			float fYCmdVel = clt.output(nCurrPos - nMidPos);
+        	// ROS_INFO("Current cmd vel Y: %f", fYCmdVel); 
+			ROS_INFO("middle: %4d | position: %4d", nMidPos, nCurrPos);
+			geometry_msgs::Twist cmd_vel;
+        	cmd_vel.linear.x = fXCmdVel;
+        	cmd_vel.linear.y = 0.;
+        	cmd_vel.linear.z = 0;
+        	cmd_vel.angular.x = 0;
+        	cmd_vel.angular.y = 0;
+        	cmd_vel.angular.z = max(-0.5f, min(0.5f, -fYCmdVel));
+        	pubCmdVel.publish(cmd_vel);
+		}
+        ros::spinOnce();
+    }
+}

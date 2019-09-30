@@ -1,0 +1,9 @@
+<launch>
+    <arg name="port" default="/dev/ttyUSB0"/>
+    <arg name="baud_rate" default="300"/>
+
+    <node pkg="ccd_camera" type="test_serial_node" name="test_serial">
+        <param name="port" type="str" value="$(arg port)"/>
+        <param name="baud_rate" type="int" value="$(arg baud_rate)"/>
+    </node>
+</launch>

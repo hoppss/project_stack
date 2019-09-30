@@ -1,0 +1,36 @@
+<robot name="autolabor_description">
+  <link name="base_link">
+    <visual>
+      <origin
+        xyz="-0.363 0.3085 0.2883"
+        rpy="0. 1.57 -1.57" />
+      <geometry>
+        <mesh
+          filename="package://autolabor_description/meshes/autolabor_pro1.stl" scale="0.001 0.001 0.001"/>
+      </geometry>
+      <material
+        name="">
+        <color
+          rgba="0.96 0.81 0.36 1" />
+      </material>
+    </visual>
+  </link>
+
+  <link name="laser">
+  </link>
+
+  <link name="imu_link">
+  </link>
+
+  <joint name="laser_joint" type="fixed">
+    <parent link="base_link"/>
+    <child link="laser"/>
+    <origin rpy="0 0 0" xyz="0.162 0 0"/>
+  </joint>
+
+  <joint name="imu_joint" type="fixed">
+    <parent link="base_link"/>
+    <child link="imu_link"/>
+    <origin rpy="0 0 0" xyz="0 0 0"/>
+  </joint>
+</robot>

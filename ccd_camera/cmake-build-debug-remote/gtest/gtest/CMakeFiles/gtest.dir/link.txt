@@ -1,0 +1,1 @@
+/usr/bin/c++  -fPIC -g  -shared -Wl,-soname,libgtest.so -o libgtest.so CMakeFiles/gtest.dir/src/gtest-all.cc.o  -L/home/attb3/catkin_ws/src/ccd_camera/cmake-build-debug-remote/gtest/gtest/src 

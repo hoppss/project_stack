@@ -1,0 +1,10 @@
+<launch>
+	<arg name="map" default="$(find autolabor_teleop)/map/20190506/map.yaml"/>
+	<include file="$(find autolabor_pro1_driver)/launch/driver_hokuyo.launch"/>
+	<include file="$(find autolabor_teleop)/launch/autolabor_move_base.launch">
+		<arg name="map" value="$(arg map)"/>
+	</include>
+    <include file="$(find rosbridge_server)/launch/rosbridge_udp.launch" ns="rosbridge_udp"/>
+    <include file="$(find rosbridge_server)/launch/rosbridge_tcp.launch" ns="rosbridge_tcp"/>
+</launch>
+

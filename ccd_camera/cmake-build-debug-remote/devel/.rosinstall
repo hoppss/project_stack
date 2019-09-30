@@ -1,0 +1,2 @@
+- setup-file:
+    local-name: /home/attb3/catkin_ws/src/ccd_camera/cmake-build-debug-remote/devel/setup.sh

@@ -1,0 +1,12 @@
+<launch>
+    <arg name="model" default="$(env TURTLEBOT3_MODEL)" doc="model type [burger, waffle, waffle_pi]"/>
+
+    <include file="$(find obstacle_avoidance)/launch/obstacle_avoidance.launch" >
+    </include>
+
+    <include file="$(find turtlebot3_bringup)/launch/turtlebot3_remote.launch">
+        <arg name="model" value="$(arg model)"/>
+     </include>
+
+    <node name="rviz" pkg="rviz" type="rviz" args="-d $(find obstacle_avoidance)/rviz/turtlebot3_gazebo_obstacle.rviz"/>
+</launch>

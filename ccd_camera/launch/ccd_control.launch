@@ -1,0 +1,27 @@
+<launch>
+    <arg name="node_name" default="ccd_camera_node"/>
+    <arg name="nav_cmd_vel" default="/move_base/follow_flag"/>
+    <arg name="cmd_vel" default="/cmd_vel"/>
+    <arg name="use_nav" default="false"/>
+    <arg name="port" default="/dev/ccd"/>
+	<arg name="mid_pos" default="64"/>
+    <arg name="Kp" default="0.015"/>
+    <arg name="Ki" default="0.0"/>
+    <arg name="Kd" default="0."/>
+    <arg name="linear_x" default="0.1"/>
+    <arg name="max_angle" default="0.5"/>
+
+    <node pkg="ccd_camera" type="ccd_camera_node" name="$(arg node_name)" output="screen">
+        <remap from="nav_cmd_vel" to="$(arg nav_cmd_vel)"/>
+        <remap from="cmd_vel" to="$(arg cmd_vel)"/>
+
+        <param name="use_nav" type="bool" value="$(arg use_nav)"/>
+        <param name="port" type="str" value="$(arg port)"/>
+		<param name="mid_pos" type="int" value="$(arg mid_pos)"/>
+        <param name="Kp" type="double" value="$(arg Kp)"/>
+        <param name="Ki" type="double" value="$(arg Ki)"/>
+        <param name="Kd" type="double" value="$(arg Kd)"/>
+        <param name="linear_x" type="double" value="$(arg linear_x)"/>
+        <param name="max_angle" type="double" value="$(arg max_angle)"/>
+    </node>
+</launch>

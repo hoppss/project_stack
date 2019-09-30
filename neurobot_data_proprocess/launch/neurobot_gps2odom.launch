@@ -1,0 +1,35 @@
+<launch>
+    <arg name="play_bag" default="true" />
+    <arg name="use_rviz" default="true" />
+    <arg name="use_debug" default="true" />
+    <arg name="bag_filename"
+         default="/home/yonghui/Datasets/neurobot/localization/2019-09-28/2019-09-28-10-35-29.bag" />
+
+
+
+    <node pkg="neurobot_data_proprocess" type="gps2odom" name="gps2odom" output="screen">
+        <param name="global_frame" value="odom" />
+        <param name="odom_frame" value="vo"/>
+        <param name="wait_init_time" value="30"/>
+        <param name="use_debug" value="true"/>
+
+        <remap from="yaw_odom" to="/yaw_odom" />
+        <remap from="gps_meas" to="/odom" />
+    </node>
+
+    <group if="$(arg play_bag)">
+        <param name="/use_sim_time" value="true" />
+        <param name="robot_description"
+               textfile="$(find neurobot_description)/urdf/neurobot_v2.urdf" />
+
+        <node name="playbag" pkg="rosbag" type="play"
+              args="--clock $(arg bag_filename)" />
+        <node pkg="tf" type="static_transform_publisher" name="laser_base_link_boardcast" args="0 0 0 0 0 0 1 map base_link 20"/>
+    </group>
+
+    <group if="$(arg use_rviz)">
+        <node pkg="rviz" type="rviz" name="rviz" args="-d $(find neurobot_data_proprocess)/rviz/gps2odom.rviz" />
+    </group>
+
+<!--    <node pkg="data_visualization" type="data_visualization_node" name="data_visualization" />-->
+</launch>
