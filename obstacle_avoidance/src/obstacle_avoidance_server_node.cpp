@@ -11,7 +11,7 @@
 
 int main(int argc, char **argv)
 {
-    ros::init(argc, argv, "obstacle_avoidance_node");
+    ros::init(argc, argv, "obstacle_avoidance_server_node");
     ros::console::set_logger_level(ROSCONSOLE_DEFAULT_NAME, ros::console::levels::Debug);
     tf::TransformListener tf;
     obstacle_avoidance::NavSimulator sim;
