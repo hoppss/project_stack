@@ -24,24 +24,50 @@ namespace rolling_window
     public:
 //        RollingWindow();
 
+        /**
+         * @brief Construct function
+         *
+         * @param tf
+         * @param name
+         */
         RollingWindow(tf::TransformListener &tf, string name);
 
+        /**
+         * @brief Set global goal, before you start use rolling window,
+         * you should call this function at least once
+         *
+         * @param global_goal
+         */
         void setGlobalGoal(const geometry_msgs::PoseStamped &global_goal);
 
-        void solveLocalGoal(geometry_msgs::PoseStamped &local_goal);
+        /**
+         * @brief One step of rolling window, get the best local goal at
+         * current time, user should call this function with certain frequency,
+         * util get the global goal
+         *
+         * @param local_goal Output target goal
+         * @return If robot can direct move towards global goal, return true
+         * else return false.
+         */
+        bool solveLocalGoal(geometry_msgs::PoseStamped &local_goal);
 
+        /**
+         * @brief Find the minimum distance to obstacle at current time
+         * !!!DO NOT USE, BUG EXIST IN THIS FUNCTION!!!
+         *
+         * @return
+         */
         double obstacleMinDist();
 
-    protected:
         /**
          * @brief coordinate convert: input_frame->output_frame
          *
-         * @param global_msg
-         * @param base_msg
+         * @param input_msg
+         * @param output_msg
          * @param output_frame
          * @return
          */
-        bool getTargetFramePose(const geometry_msgs::PoseStamped &global_msg, geometry_msgs::PoseStamped &base_msg, const string &output_frame);
+        bool getTargetFramePose(const geometry_msgs::PoseStamped &input_msg, geometry_msgs::PoseStamped &output_msg, const string &output_frame);
 
         /**
           * @brief coordinate convert: base_link->world
@@ -61,6 +87,7 @@ namespace rolling_window
          */
         bool getBaseFramePose(const geometry_msgs::PoseStamped &global_msg, geometry_msgs::PoseStamped &base_msg);
 
+    protected:
         /**
          * @brief Given the edge polar coordinate, calculated with the relative edge goal and half of safe distance.
          * For more specific description please refer to the brief of `findLocalSubOptimalGoal` function.
@@ -117,15 +144,10 @@ namespace rolling_window
          * function:
          *
          * A: Generate candidate local goals.Generally. We will consider two main types of local goal when creating
-         * candidate goals:
-         *
-         *  1. Middle local goals, the middle point calculated by the point pair with minimum distance of
-         *  adjacent obstacles.
-         *
-         *  2. Edge local goals, this kind of goals is calculated by the edge points of the obstacles and half of safe
+         * candidate goals, which is calculated by the edge points of the obstacles and half of safe
          *  distance. The first front edge point and the last back edge point will be created as the edge local goal.
-         *  Besides, if the middle local goal is within the goal-reach distance threshold, we will also split it into
-         *  two (front and back) obstacle edge goals.
+         *  Besides, if the range between two obstacles is able to pass (has an interval degree), we will also generate
+         *  (front and back) obstacle edge goals.
          *
          * B: Traverse all candidate local goals and find the best one. In this step we simply evaluate the sum of
          * distances from local goal to base and goal position. It is more accurate and robust if using A*'s path
@@ -174,7 +196,8 @@ namespace rolling_window
         double goal_reach_dist_;  ///<@brief if goal is arrived, if sub goal is arrived, we will split it into two different goal
 
         // different action range threshold
-        double obstacle_range_;  ///<@brief within this range, base should slow down to prepare for the planning
+        double obstacle_range_;  ///<@brief Within this range, base should slow down to prepare for the planning
+        double min_range_;  ///<@brief Min valid range, scan point within this range will be ignored
 //        double plan_range_;  ///<@brief within this range, base should start calling rolling window to plan the local optimal goal
 //        double stop_range_;  ///<@brief within this range, obstacle is too close to avoid, base should immediately stop
         double min_angle_;  ///<@brief laser scan min angle

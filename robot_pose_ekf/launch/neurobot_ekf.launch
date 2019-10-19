@@ -3,25 +3,23 @@
     <arg name="odom_topic" default="/odom_gps" />
     <arg name="imu_topic" default="/imu/data" />
     <arg name="gps_topic" default="/gps_meas" />
-    <arg name="bag_filename" default="/home/yonghui/Datasets/neurobot/localization/2019-09-28/2019-09-28-10-29-20.bag"/>
+    <arg name="yaw_topic" default="/yaw_odom" />
+    <arg name="play_bag" default="true" />
+<!--    <arg name="bag_filename" default="/home/yonghui/Datasets/neurobot/localization/2019-10-11/2019-10-11-15-36-36.bag"/>-->
+    <arg name="bag_filename" default="/home/yonghui/Datasets/neurobot/localization/2019-10-14/2019-10-14-09-55-50.bag"/>
     <arg name="use_rviz" default="true" />
 
-<!--    <param name="/use_sim_time" value="true" />-->
-    <param name="robot_description"
-           textfile="$(find neurobot_description)/urdf/neurobot_v2.urdf" />
-    <node name="robot_state_publisher" pkg="robot_state_publisher"
-        type="robot_state_publisher" />
-
 <!--    <include file="$(find imu_3dm_gx4)/launch/merge.launch" />-->
-    <include file="$(find neurobot_data_proprocess)launch/neurobot_imugps2odom.launch">
+    <include file="$(find neurobot_data_proprocess)launch/neurobot_odom2gps.launch">
         <arg name="play_bag" value="false" />
         <arg name="use_rviz" value="false" />
-        <arg name="use_debug" value="false" />
+        <arg name="use_debug" value="true" />
     </include>
 
     <node pkg="robot_pose_ekf" type="robot_pose_ekf" name="$(arg ekf_node_name)" output="screen" >
 <!--        launch-prefix="xterm -e gdb -ex run &#45;&#45;args ">-->
         <param name="base_footprint_frame" value="base_link" />
+        <param name="global_frame" value="world" />
         <param name="output_frame" value="odom"/>
         <param name="freq" value="30.0"/>
         <param name="sensor_timeout" value="1.0"/>
@@ -29,13 +27,16 @@
         <param name="imu_used" value="false"/>
         <param name="vo_used" value="false"/>
         <param name="gps_used" value="true" />
+        <param name="yaw_used" value="true" />
+        <param name="yaw_split" value="true" />
         <param name="debug" value="false"/>
-        <param name="self_diagnose" value="true"/>
+        <param name="self_diagnose" value="false"/>
 
         <remap from="odom" to="$(arg odom_topic)" />
         <remap from="imu_data" to="$(arg imu_topic)" />
 <!--        <remap from="vo" to="$(arg gps_topic)" />-->
         <remap from="gps" to="$(arg gps_topic)" />
+        <remap from="yaw" to="$(arg yaw_topic)" />
     </node>
 
     <node pkg="neurobot_data_proprocess" type="combine_odom_stamped" name="combine_odom_stamped" output="screen">
@@ -43,9 +44,22 @@
         <remap from="gps_meas" to="/gps_meas" />
     </node>
 
-<!--    <node name="playbag" pkg="rosbag" type="play"-->
-<!--          args="-r 4 &#45;&#45;clock $(arg bag_filename)" />-->
+    <group if="$(arg play_bag)">
+        <param name="robot_description"
+               textfile="$(find neurobot_description)/urdf/neurobot_v2.urdf" />
 
-    <node name="rviz" pkg="rviz" type="rviz"
-          args="-d $(find robot_pose_ekf)/rviz/neurobot.rviz" />
+        <node name="robot_state_publisher" pkg="robot_state_publisher"
+              type="robot_state_publisher" />
+
+        <param name="/use_sim_time" value="true" />
+
+        <node name="playbag" pkg="rosbag" type="play"
+              args="--clock $(arg bag_filename)" />
+    </group>
+
+    <group if="$(arg use_rviz)">
+        <node name="rviz" pkg="rviz" type="rviz"
+              args="-d $(find robot_pose_ekf)/rviz/neurobot.rviz" />
+    </group>
+
 </launch>

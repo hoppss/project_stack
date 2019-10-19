@@ -8,9 +8,12 @@
 #include <sensor_msgs/LaserScan.h>
 #include <geometry_msgs/PoseStamped.h>
 #include <visualization_msgs/Marker.h>
+#include <visualization_msgs/MarkerArray.h>
 
 #include <vector>
 #include <string>
+#include <ros/publisher.h>
+
 using namespace std;
 
 namespace rolling_window
@@ -21,6 +24,8 @@ namespace rolling_window
 
     visualization_msgs::Marker createMarker(const geometry_msgs::PoseStamped &pose_msgs, int id, const string &ns,
                                             vector<double> rgba);
+
+    void deleteAllMarkers(ros::Publisher &pub);
 
     void setIdentityPoseStamped(geometry_msgs::PoseStamped &pose_msg, const string &frame_id);
 

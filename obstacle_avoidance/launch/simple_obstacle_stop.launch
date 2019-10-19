@@ -2,7 +2,7 @@
     <arg name="cmd_vel" default="/cmd_vel"/>
     <arg name="scan" default="/scan"/>
 
-    <node pkg="obstacle_stop" type="simple_obstacle_stop_node" name="simple_obstacle_stop" output="screen">
+    <node pkg="obstacle_avoidance" type="simple_obstacle_stop_node" name="simple_obstacle_stop" output="screen">
         <param name="base_radius" type="double" value="0.2"/>
         <param name="slow_dis" type="double" value="1.0"/>
         <param name="stop_dis" type="double" value="0.5"/>

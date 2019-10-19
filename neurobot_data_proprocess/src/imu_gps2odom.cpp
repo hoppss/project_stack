@@ -73,7 +73,7 @@ protected:
     ros::Publisher imu_yaw_pub_;
     ros::Publisher gps_odom_pub_;
 //    ros::Subscriber imu_sync_sub_;
-//    ros::Subscriber gps_meas_sub_;
+//    ros::Subscriber odom_sub_;
     message_filters::Subscriber<sensor_msgs::Imu> imu_sync_sub_;
     message_filters::Subscriber<nav_msgs::Odometry> gps_meas_sub_;
     Synchronizer<OdomSyncPolicy > sync_;
@@ -171,7 +171,7 @@ void ImuGps2Odom::gpsOdomTransformCb(const sensor_msgs::ImuConstPtr &imu_msg,
 
     // initialize, publish gps odometry
     nav_msgs::Odometry odom_msg;
-//    gps2odom(yaw, *gps_meas_msg, odom_msg);
+//    odom2gps(yaw, *gps_meas_msg, odom_msg);
     gps2odom(yaw, *gps_meas_msg, odom_msg);
     odom_msg.header.frame_id = global_frame_;
     if (use_debug_)

@@ -19,17 +19,17 @@ namespace obstacle_avoidance
 
         void tic()
         {
-            t_start = ros::Time::now();
+            t_start_ = ros::Time::now();
         }
 
         double toc()
         {
             ros::Time t_end = ros::Time::now();
-            return t_end.toSec() - t_start.toSec();
+            return t_end.toSec() - t_start_.toSec();
         }
 
     protected:
-        ros::Time t_start;
+        ros::Time t_start_;
 
     };
 }

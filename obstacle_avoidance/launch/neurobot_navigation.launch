@@ -1,13 +1,10 @@
 <launch>
-    <arg name="model" default="$(env TURTLEBOT3_MODEL)" doc="model type [burger, waffle, waffle_pi]"/>
+<!--    <include file="$(find robot_pose_ekf)/launch/neurobot_ekf.launch" >-->
+<!--        <arg name="play_bag" value="false" />-->
+<!--    </include>-->
 
     <include file="$(find obstacle_avoidance)/launch/obstacle_avoidance.launch" >
-        <arg name="base_model" value="turtlebot3" />
+        <arg name="base_model" value="neurobot" />
+        <arg name="cmd_vel_topic" value="/cmd_vel" />
     </include>
-
-    <include file="$(find turtlebot3_bringup)/launch/turtlebot3_remote.launch">
-        <arg name="model" value="$(arg model)"/>
-     </include>
-
-    <node name="rviz" pkg="rviz" type="rviz" args="-d $(find obstacle_avoidance)/rviz/turtlebot3_gazebo_obstacle.rviz"/>
 </launch>

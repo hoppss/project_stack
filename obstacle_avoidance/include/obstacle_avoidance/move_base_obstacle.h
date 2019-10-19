@@ -28,6 +28,7 @@
 using namespace std;
 
 //#include "controller.h"
+#include <obstacle_avoidance/TransformPoseStamped.h>
 #include "tic_toc.h"
 
 
@@ -42,7 +43,16 @@ namespace obstacle_avoidance
 
         ~MoveBaseObstacle();
 
+        bool transformPoseStampedCb(TransformPoseStamped::Request &req, TransformPoseStamped::Response &res);
+
     protected:
+        /**
+         * @brief Get robot pose using rolling window's interface
+         * @param robot_pose
+         * @return
+         */
+        bool getRobotPoseRollingWindow(tf::Stamped<tf::Pose> &robot_pose);
+
         /**
          * @brief 发布停车速度
          */
@@ -81,7 +91,11 @@ namespace obstacle_avoidance
         bool isQuaternionValid(const geometry_msgs::Quaternion& q);
 
         /**
-         * @brief 从goal_pose_msg 的坐标系变换到global frame id下
+         * @brief 从goal_pose_msg 的坐标系变换到global frame id下, 这个函数写的不好,
+         * 因为上一个项目用tf::Stamped<tf::Pose>来存储位姿信息, 这个函数跟着保留了下来,
+         * 但是在写rolling window的时候发现geometry_msgs::PoseStamped还是更方便一点
+         * 现在程序中出现两者混用的情况, 转换来转换去很麻烦, 有时间考虑重构
+         *
          * @param goal_pose_msg     输入位姿
          * @param global_pose_msg   输出全局位姿
          * @return
@@ -102,7 +116,6 @@ namespace obstacle_avoidance
          * @return
          */
         double getGoalDirection(const tf::Stamped<tf::Pose> &global_robot_pose, const tf::Stamped<tf::Pose> &global_goal_pose);
-
 
         /**
          * @brief 调用rolling window寻找一次局部子目标, 并算出直线路径
@@ -140,13 +153,15 @@ namespace obstacle_avoidance
         MoveBaseActionServer *as_;
 
         //!topic
-        ros::Publisher current_goal_pub_;  ////< @brief topic: /move_base(_node)/current_goal
+        ros::Publisher current_goal_pub_;  ////< @brief topic: /obstacle_avoidance_server/current_goal
         ros::Publisher vel_pub_;  ////< @brief topic: /cmd_vel
         ros::Publisher action_goal_pub_;  ////< @brief topic: /move_base/goal
         ros::Subscriber goal_sub_;  ////< @brief topic: /move_base_simple/goal
         // path
-        ros::Publisher gp_pub_;  ///<@brief topic: /move_base(_node)/global_path
-        ros::Subscriber gp_sub_;  ///<@brief topic: /move_base(_node)/global_path
+        ros::Publisher gp_pub_;  ///<@brief topic: /obstacle_avoidance_server/global_path
+        ros::Subscriber gp_sub_;  ///<@brief topic: /obstacle_avoidance_server/global_path
+        // transform pose
+        ros::ServiceServer trans_srv_;  ///<@brief topic: /obstacle_avoidance_server/transform_posestamped
 
         //! frame id
         std::string global_frame_;  ////< @brief 全局frame
@@ -160,6 +175,7 @@ namespace obstacle_avoidance
         TicToc makeplan_timer_;  ///<@brief 定时进行rolling window计时器
         double rw_time_thres_;  ///<@brief 进行一次rolling window的时间间隔
         double rw_dist_thres_;  ///<@brief 距离目标点多近重新进行一次rolling window
+        double rw_stop_thres_;  ///<@brief rolling window扫描障碍物停止阈值
 
         //! frame and pose
         tf::Stamped<tf::Pose> global_robot_pose_;  ////< @brief 机器人全局frame下位姿
@@ -181,6 +197,13 @@ namespace obstacle_avoidance
         //! state and flag
         bool goal_init_;  ////< @brief 获得新目标点的标志位
         int fail_cnt_;  ///<@brief local planner控制失败次数
+
+        //! global no obstacle delay
+        bool use_global_delay_;  ///<@brief 是否启用global delay, 这是为了防止底盘绕过障碍物时过早向global Goal移动
+        int global_delay_thres_;  ///<@brief global delay的上溢阈值, 控制次数为单位
+        int global_delay_cnt_;  ///<@brief 当前连续允许向global goal控制的次数
+        geometry_msgs::PoseStamped last_local_goal_;  ///<@brief 记录上一次rolling window / global delay的local goal
+        geometry_msgs::Twist last_cmd_vel_;  ///<@brief 记录上一次cmd_vel
     };
 }
 

@@ -57,10 +57,12 @@
   <build_depend>std_msgs</build_depend>
   <build_depend>pluginlib</build_depend>
   <build_depend>actionlib</build_depend>
+  <build_depend>message_generation</build_depend>
   <build_depend>move_base_msgs</build_depend>
   <build_depend>nav_core</build_depend>
   <build_depend>costmap_2d</build_depend>
   <build_depend>base_local_planner</build_depend>
+  <build_depend>gps_common</build_depend>
   <build_depend>rolling_window</build_depend>
 
   <build_export_depend>tf</build_export_depend>
@@ -75,6 +77,7 @@
   <build_export_depend>nav_core</build_export_depend>
   <build_export_depend>costmap_2d</build_export_depend>
   <build_export_depend>base_local_planner</build_export_depend>
+  <build_export_depend>gps_common</build_export_depend>
   <build_export_depend>rolling_window</build_export_depend>
 
   <exec_depend>tf</exec_depend>
@@ -85,10 +88,12 @@
   <exec_depend>std_msgs</exec_depend>
   <exec_depend>pluginlib</exec_depend>
   <exec_depend>actionlib</exec_depend>
+  <exec_depend>message_runtime</exec_depend>
   <exec_depend>move_base_msgs</exec_depend>
   <exec_depend>nav_core</exec_depend>
   <exec_depend>costmap_2d</exec_depend>
   <exec_depend>base_local_planner</exec_depend>
+  <exec_depend>gps_common</exec_depend>
   <exec_depend>rolling_window</exec_depend>
 
   <!-- The export tag contains other, unspecified, tags -->

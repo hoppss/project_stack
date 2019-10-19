@@ -34,7 +34,7 @@
 
 /* Author: Wim Meeussen */
 
-#include <robot_pose_ekf/odom_estimation.h>
+#include "robot_pose_ekf/odom_estimation.h"
 
 using namespace MatrixWrapper;
 using namespace BFL;
@@ -303,7 +303,7 @@ namespace estimation
         decomposeTransform(gps_meas_, gps_vec(1), gps_vec(2), gps_vec(3), tmp, tmp, tmp);
 
         //! yonghui add
-        ROS_INFO("GPS measurement: x=%9.4f, y=%9.4f, z=%9.4f", gps_vec(1), gps_vec(2), gps_vec(3));
+//        ROS_INFO("GPS measurement: x=%9.4f, y=%9.4f, z=%9.4f", gps_vec(1), gps_vec(2), gps_vec(3));
         gps_flag_ = true;
         gps_prior_estimate_vec_ = filter_->PostGet()->ExpectedValueGet();
         if (!filter_->Update(gps_meas_model_,  gps_vec))  //! is update success
@@ -337,9 +337,9 @@ namespace estimation
         filter_estimate_old_vec_ = filter_->PostGet()->ExpectedValueGet();
     else
         filter_estimate_old_vec_ = gps_prior_estimate_vec_;
-    ROS_INFO("EKF update result; x=%9.4f, y=%9.4f, z=%9.4f, r=%9.4f, p=%9.4f, y=%9.4f",
-            filter_estimate_old_vec_(1), filter_estimate_old_vec_(2), filter_estimate_old_vec_(3),
-            filter_estimate_old_vec_(4), filter_estimate_old_vec_(5), filter_estimate_old_vec_(6));
+//    ROS_INFO("EKF update result; x=%9.4f, y=%9.4f, z=%9.4f, r=%9.4f, p=%9.4f, y=%9.4f",
+//            filter_estimate_old_vec_(1), filter_estimate_old_vec_(2), filter_estimate_old_vec_(3),
+//            filter_estimate_old_vec_(4), filter_estimate_old_vec_(5), filter_estimate_old_vec_(6));
     tf::Quaternion q;
     q.setRPY(filter_estimate_old_vec_(4), filter_estimate_old_vec_(5), filter_estimate_old_vec_(6));
     filter_estimate_old_ = Transform(q,

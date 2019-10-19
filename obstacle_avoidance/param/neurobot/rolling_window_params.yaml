@@ -2,13 +2,13 @@ rolling_window:
   global_frame: odom
   base_frame: base_link
   transform_tolerance: 1.0  # tf变换监听时限, 超过这个时差的tf变换认为无效
-  base_diameter: 0.4  # 底盘直径, 计算安全间距使用
-  inflation_radius: 0.4  # 膨胀区半径, 计算安全距离使用
+  base_diameter: 0.45  # 底盘直径, 计算安全间距使用
+  inflation_radius: 0.8  # 膨胀区半径, 计算安全距离使用
   goal_reach_dist: 0.5  # Middle子目标点拆分成两个Edge子目标点间距阈值
-  obstacle_range: 3.0  # 障碍物距离
+  obstacle_range: 5.0  # 障碍物距离
   min_angle: -1.57  # 扫描角度上限
   max_angle: 1.57  # 扫描角度下限
   check_goal_angle: 0.7854  # 判断目标可直接到达的角度范围
-  dist_cost_scale: 5.0  # 评价子目标距离代价的权重
-  angle_cost_scale: 1.0  # 评价子目标角度代价的权重
+  dist_cost_scale: 1.0  # 评价子目标距离代价的权重
+  angle_cost_scale: 2.0  # 评价子目标角度代价的权重
   use_debug: true

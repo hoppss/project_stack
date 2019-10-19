@@ -26,7 +26,8 @@ namespace rolling_window
         param_nh.param("base_diameter", base_diameter_, 0.4);
         param_nh.param("inflation_radius", inflation_radius_, 0.2);
         param_nh.param("goal_reach_dist", goal_reach_dist_, 0.5);
-        param_nh.param("obstacle_range", obstacle_range_, 3.0);
+        param_nh.param("obstacle_range", obstacle_range_, 5.0);
+        param_nh.param("min_range_", min_range_, 0.01);
 //        param_nh.param("plan_range", plan_range_, 1.0);
 //        param_nh.param("stop_range", stop_range_, 0.5);
         param_nh.param("min_angle", min_angle_, -1.57);
@@ -46,12 +47,24 @@ namespace rolling_window
 
     void RollingWindow::setGlobalGoal(const geometry_msgs::PoseStamped &global_goal)
     {
-        goal_pose_ = global_goal;
+        if (global_goal.header.frame_id == global_frame_)
+        {
+            goal_pose_ = global_goal;
+            return;
+        }
+
+        geometry_msgs::PoseStamped tmp_goal = global_goal;
+        tmp_goal.header.stamp = ros::Time::now();
+        getGlobalFramePose(tmp_goal, goal_pose_);
     }
 
 
-    void RollingWindow::solveLocalGoal(geometry_msgs::PoseStamped &local_goal)
+    bool RollingWindow::solveLocalGoal(geometry_msgs::PoseStamped &local_goal)
     {
+        // delete all markers in rviz
+        deleteAllMarkers(obs_marker_pub_);
+        deleteAllMarkers(subgoal_marker_pub_);
+
         ros::Time t_start = ros::Time::now();
 
         // update global base pose
@@ -71,8 +84,9 @@ namespace rolling_window
         // after check goal direction return true, return global goal
         if (obstacles_.empty() || checkGlobalGoalAvailable())
         {
+            ROS_INFO("Find direct path to global goal.");
             local_goal = goal_pose_;
-            return;
+            return true;
         }
 
         // find sub optimal goal
@@ -81,19 +95,20 @@ namespace rolling_window
         // statistic time
         ros::Time t_end = ros::Time::now();
         ROS_DEBUG_STREAM("Solve local time cost: " << t_end.toSec() - t_start.toSec());
+        return false;
     }
 
 
     double RollingWindow::obstacleMinDist()
     {
         if (obstacles_.empty())
-            return -1;
+            return FLT_MAX;
 
         double min_dist = DBL_MAX;
         for (int i=0; obstacles_.size(); i++)
         {
             double curr_dist = obstacles_[i].min_dist();
-            if (curr_dist > 0 && curr_dist < min_dist)
+            if (curr_dist > min_range_ && curr_dist < min_dist)
                 min_dist = curr_dist;
         }
         return min_dist;
@@ -114,12 +129,18 @@ namespace rolling_window
         // listern transformation between: input_frame->output_frame
         try
         {
+            bool wait_flag = tf_.waitForTransform(output_frame, input_frame, ros::Time::now(), ros::Duration(transform_tolerance_));
+            ROS_DEBUG("Wait util [%s]->[%s] transform: %d", input_frame.c_str(), output_frame.c_str(), wait_flag);
             tf_.transformPose(output_frame, input_pose, output_pose);
+//            tf::StampedTransform pose;
+//            tf_.lookupTransform(output_frame, input_frame, ros::Time::now(), pose);
+//            tf::Vector3 t = pose.getOrigin();
+//            ROS_WARN("Look up translation: % f, %f, %f", t[0], t[1], t[2]);
         }
         catch (tf::TransformException &ex)
         {
-            ROS_WARN("Fail to transform robot pose from [%s] into the frame: [%s]",
-                     input_frame.c_str(), output_frame.c_str());
+            ROS_DEBUG("Fail to transform robot pose from [%s] into the frame: [%s]: %s",
+                     input_frame.c_str(), output_frame.c_str(), ex.what());
             return false;
         }
 
@@ -180,12 +201,25 @@ namespace rolling_window
             ROS_ERROR("Fail to get global goal pose in base frame.");
             return false;
         }
-        double goal_yaw = tf::getYaw(base_goal_msg.pose.orientation);
+        double goal_yaw = atan2(base_goal_msg.pose.position.y, base_goal_msg.pose.position.x);
+        double goal_dist = hypot(base_goal_msg.pose.position.x, base_goal_msg.pose.position.y);
+//        double check_dist = min(goal_dist, obstacle_range_);
+//        ROS_WARN("Check base goal pose: x=%7.4f, y=%7.4f, yaw=%7.4f",
+//                 base_goal_msg.pose.position.x,
+//                 base_goal_msg.pose.position.y,
+//                 goal_yaw);
+//        ROS_WARN("Check gloabl goal angle: goal_yaw=%7.4f, min_angle=%7.4f, max_angle=%7.4f",
+//                goal_yaw,
+//                goal_yaw-check_goal_range_,
+//                goal_yaw+check_goal_range_);
         int min_idx = getScanRangesIndex(scan_msg_, goal_yaw-check_goal_range_);
         int max_idx = getScanRangesIndex(scan_msg_, goal_yaw+check_goal_range_);
+//        ROS_WARN("Scan angle range: goal=%7.4f, min=%7.4f, max=%7.4f", goal_yaw, goal_yaw-check_goal_range_, goal_yaw+check_goal_range_);
+//        ROS_WARN("Scan idx range: min=%03d, max=%03d", min_idx, max_idx);
         for (int i=min_idx; i<=max_idx; i++)
         {
-            if (scan_msg_.ranges[i] <= obstacle_range_)
+//            ROS_WARN("scan point[%03d]=%7.4f", i, scan_msg_.ranges[i]);
+            if (scan_msg_.ranges[i] > min_range_ && scan_msg_.ranges[i] <= obstacle_range_)
                 return false;
         }
         return true;
@@ -204,10 +238,13 @@ namespace rolling_window
         int max_idx = getScanRangesIndex(scan_msg_, max_angle);
         double curr_angle = min_angle;
         double delta_angle = scan_msg_.angle_increment;
+        ROS_DEBUG("Total scan number: %d", ranges.size());
         for (int i=min_idx; i<max_idx; i++)
         {
+//            ROS_WARN("scan point[%03d]=%7.4f", i, ranges[i]);
+
             // 如果这个点距离大于反应距离, 忽略
-            if (ranges[i] > obstacle_range_)
+            if (ranges[i] < min_range_ || ranges[i] > obstacle_range_)
             {
                 curr_angle += delta_angle;
                 continue;
@@ -217,6 +254,7 @@ namespace rolling_window
             // 直接创建新的obstacle, 并添加到vector中
             if (obstacles_.empty() || !obstacles_.back().push_back(curr_angle, ranges[i]))
             {
+                ROS_WARN("New obstacle index start at: %03d", i);
                 Obstacle obs(safe_dist_);
                 obs.push_back(curr_angle, ranges[i]);
                 obstacles_.push_back(obs);
@@ -277,7 +315,7 @@ namespace rolling_window
 
         if (use_debug_)
         {
-            ROS_DEBUG("Detect obstacle number: %ld", obstacles_.size());
+            ROS_INFO("Detect obstacle number: %ld", obstacles_.size());
             publishObstacleMarkers(obstacles_);
         }
     }
@@ -320,7 +358,7 @@ namespace rolling_window
                 geometry_msgs::PoseStamped start_global_msg;
                 getObstacleEdgeGoal(start_angle, start_dist, true, start_global_msg);
 
-                ROS_DEBUG("Start local sub goal [%02d]: [%7.4f, %7.4f]",
+                ROS_INFO("Start local sub goal [%02d]: [%9.4f, %9.4f]",
                           i, start_global_msg.pose.position.x, start_global_msg.pose.position.y);
 
                 candidate_goals.push_back(start_global_msg);
@@ -345,7 +383,7 @@ namespace rolling_window
                 getObstacleEdgeGoal(end_angle, end_dist, false, end_global_msg);
                 getGlobalFramePose(end_global_msg, end_global_msg);
 
-                ROS_DEBUG("End local sub goal [%02d]: [%7.4f, %7.4f]",
+                ROS_INFO("End local sub goal [%02d]: [%9.4f, %9.4f]",
                           i, end_global_msg.pose.position.x, end_global_msg.pose.position.y);
                 candidate_goals.push_back(end_global_msg);
                 continue;  // 最后一个点了, 后面不要处理了
@@ -380,7 +418,8 @@ namespace rolling_window
             //  防止底盘停止在这个子目标点上
             double robot_dist = hypot(middle_x, middle_y);  // TODO: 和下面评价子目标点计算距离一部分重复计算了
             // 中间点子目标距离底盘还有一定距离, 直接可以作为候选目标
-            if (robot_dist > goal_reach_dist_)
+//            if (robot_dist > goal_reach_dist_)
+            if (false)  // TODO: 弃用障碍物中间点作为子目标点, 是否能重新利用中间点?
             {
                 middle_pose.header.stamp = ros::Time();
                 middle_pose.header.frame_id = base_frame_;
@@ -392,7 +431,7 @@ namespace rolling_window
                 getGlobalFramePose(middle_pose, middle_global_pose);
 
                 // 添加到候选列表中
-                ROS_DEBUG("Middle local sub goal [%02d]: [%7.4f, %7.4f]",
+                ROS_INFO("Middle local sub goal [%02d]: [%9.4f, %9.4f]",
                           i, middle_global_pose.pose.position.x, middle_global_pose.pose.position.y);
                 candidate_goals.push_back(middle_global_pose);
             }
@@ -404,7 +443,7 @@ namespace rolling_window
                 obstacles[i].back(back_angle, back_dist);
                 geometry_msgs::PoseStamped back_global_msg;
                 getObstacleEdgeGoal(back_angle, back_dist, false, back_global_msg);
-                ROS_DEBUG("Middle edge back goal [%02d]: [%7.4f, %7.4f]",
+                ROS_INFO("Middle edge back goal [%02d]: [%9.4f, %9.4f]",
                           i, back_global_msg.pose.position.x, back_global_msg.pose.position.y);
                 candidate_goals.push_back(back_global_msg);
 
@@ -413,11 +452,22 @@ namespace rolling_window
                 obstacles[i+1].front(front_angle, front_dist);
                 geometry_msgs::PoseStamped front_global_msg;
                 getObstacleEdgeGoal(front_angle, front_dist, true, front_global_msg);
-                ROS_DEBUG("Middle edge front goal [%02d]: [%7.4f, %7.4f]",
+                ROS_DEBUG("Middle edge front goal [%02d]: [%9.4f, %9.4f]",
                           i, front_global_msg.pose.position.x, front_global_msg.pose.position.y);
                 candidate_goals.push_back(front_global_msg);
             }
         }
+
+        // debug current status
+        ROS_INFO("Current robot pose: frame_id=%12s x=%9.4f, y=%9.4f, yaw=%9.4f",
+                 robot_pose_.header.frame_id.c_str(),
+                 robot_pose_.pose.position.x,
+                 robot_pose_.pose.position.y,
+                 tf::getYaw(robot_pose_.pose.orientation));
+        ROS_INFO("Global goal pose: frame_id=%12s, x=%9.4f, y=%9.4f",
+                 goal_pose_.header.frame_id.c_str(),
+                 goal_pose_.pose.position.x,
+                 goal_pose_.pose.position.y);
 
         // 候选local goal根据到底盘和目标点的距离之和来排序
         // 评价使用的标准量
@@ -441,7 +491,7 @@ namespace rolling_window
                                       candidate_goals[i].pose.position.x - robot_pose_.pose.position.x);
             double angle_cost = angle_cost_scale_ * fabs( angles::normalize_angle(base_angle - goal_angle) );
             double curr_cost = dist_cost + angle_cost;
-            ROS_INFO_NAMED(name_, "Local candidate goal: [%7.4f, %7.4f], curr_dist=%7.4f",
+            ROS_INFO_NAMED(name_, "Local candidate goal: [%9.4f, %9.4f], curr_dist=%7.4f",
                            candidate_goals[i].pose.position.x, candidate_goals[i].pose.position.y, curr_dist);
             if (curr_cost <= best_cost)
             {

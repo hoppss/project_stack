@@ -1,0 +1,4 @@
+geometry_msgs/PoseStamped input_pose
+string target_frame
+---
+geometry_msgs/PoseStamped output_pose

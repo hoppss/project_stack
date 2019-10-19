@@ -72,6 +72,16 @@ namespace rolling_window
     }
 
 
+    void deleteAllMarkers(ros::Publisher &pub)
+    {
+        visualization_msgs::MarkerArray delete_arr;
+        visualization_msgs::Marker delete_marker;
+        delete_marker.action = visualization_msgs::Marker::DELETEALL;
+        delete_arr.markers.push_back(delete_marker);
+        pub.publish(delete_arr);
+    }
+
+
     int getScanRangesIndex(const sensor_msgs::LaserScan &scan_msgs, double target_angle)
     {
         double min_angle = scan_msgs.angle_min;

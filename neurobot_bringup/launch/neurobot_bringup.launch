@@ -7,9 +7,9 @@
     <arg name="odom_rate" default="30"/>
     <arg name="sensor_rate" default="5"/>
     <arg name="use_description" default="true"/>
-    <arg name="use_tf" default="true"/>
-    <arg name="use_control" default="false"/>
-    <arg name="use_rviz" default="true"/>
+    <arg name="use_tf" default="false"/>
+    <arg name="use_control" default="true"/>
+    <arg name="use_rviz" default="false"/>
 
     <param name="robot_description"
         textfile="$(find neurobot_description)/urdf/neurobot_v2.urdf" />

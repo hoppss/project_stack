@@ -157,9 +157,9 @@ include_directories(
 #   ${catkin_LIBRARIES}
 # )
 
-add_executable(gps2odom src/gps2odom.cpp)
-add_dependencies(gps2odom ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
-target_link_libraries(gps2odom
+add_executable(odom2gps src/odom2gps.cpp)
+add_dependencies(odom2gps ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
+target_link_libraries(odom2gps
     ${catkin_LIBRARIES}
 )
 

@@ -34,7 +34,7 @@
 
 /* Author: Wim Meeussen */
 
-#include <robot_pose_ekf/odom_estimation_node.h>
+#include "robot_pose_ekf/odom_estimation_node.h"
 
 
 using namespace MatrixWrapper;
@@ -56,89 +56,114 @@ namespace estimation
       imu_active_(false),
       vo_active_(false),
       gps_active_(false),
+      yaw_active_(false),
       odom_initializing_(false),
       imu_initializing_(false),
       vo_initializing_(false),
       gps_initializing_(false),
+      yaw_initializing_(false),
       odom_covariance_(6),
       imu_covariance_(3),
       vo_covariance_(6),
       gps_covariance_(3),
+      yaw_covariance_(1),
       odom_callback_counter_(0),
       imu_callback_counter_(0),
       vo_callback_counter_(0),
       gps_callback_counter_(0),
+      yaw_callback_counter_(0),
       ekf_sent_counter_(0)
   {
-    ros::NodeHandle nh_private("~");
-    ros::NodeHandle nh;
+      ros::NodeHandle nh_private("~");
+      ros::NodeHandle nh;
 
-    // paramters
-    nh_private.param("output_frame", output_frame_, std::string("odom_combined"));
-    nh_private.param("base_footprint_frame", base_footprint_frame_, std::string("base_footprint"));
-    nh_private.param("sensor_timeout", timeout_, 1.0);
-    nh_private.param("odom_used", odom_used_, true);
-    nh_private.param("imu_used",  imu_used_, true);
-    nh_private.param("vo_used",   vo_used_, true);
-    nh_private.param("gps_used",   gps_used_, false);
-    nh_private.param("debug",   debug_, false);
-    nh_private.param("self_diagnose",  self_diagnose_, false);
-    double freq;
-    nh_private.param("freq", freq, 30.0);
+      // paramters
+      nh_private.param("global_frame", global_frame_, std::string("world"));
+      nh_private.param("output_frame", output_frame_, std::string("odom_combined"));
+      nh_private.param("base_footprint_frame", base_footprint_frame_, std::string("base_footprint"));
+      nh_private.param("sensor_timeout", timeout_, 1.0);
+      nh_private.param("odom_used", odom_used_, true);
+      nh_private.param("imu_used", imu_used_, true);
+      nh_private.param("vo_used", vo_used_, true);
+      nh_private.param("gps_used", gps_used_, false);
+      nh_private.param("debug", debug_, false);
+      nh_private.param("self_diagnose", self_diagnose_, false);
+      nh_private.param("yaw_used", yaw_used_, false);  // 是否使用yaw角信息
+      nh_private.param("yaw_split", yaw_split_, true);  // 是选择在发布odom和tf树直接替换融合后的odom_combine, 还是加入ekf一起融合
+      double freq;
+      nh_private.param("freq", freq, 30.0);
 
-    tf_prefix_ = tf::getPrefixParam(nh_private);
-    output_frame_ = tf::resolve(tf_prefix_, output_frame_);
-    base_footprint_frame_ = tf::resolve(tf_prefix_, base_footprint_frame_);
+      tf_prefix_ = tf::getPrefixParam(nh_private);
+      output_frame_ = tf::resolve(tf_prefix_, output_frame_);
+      base_footprint_frame_ = tf::resolve(tf_prefix_, base_footprint_frame_);
 
-    ROS_INFO_STREAM("output frame: " << output_frame_);
-    ROS_INFO_STREAM("base frame: " << base_footprint_frame_);
+      ROS_INFO_STREAM("output frame: " << output_frame_);
+      ROS_INFO_STREAM("base frame: " << base_footprint_frame_);
 
-    // set output frame and base frame names in OdomEstimation filter
-    // so that user-defined tf frames are respected
-    my_filter_.setOutputFrame(output_frame_);  //! EKF滤波器初始化输出frame id
-    my_filter_.setBaseFootprintFrame(base_footprint_frame_);  //! EKF滤波器初始化底盘frame id
+      // set output frame and base frame names in OdomEstimation filter
+      // so that user-defined tf frames are respected
+      my_filter_.setOutputFrame(output_frame_);  //! EKF滤波器初始化输出frame id
+      my_filter_.setBaseFootprintFrame(base_footprint_frame_);  //! EKF滤波器初始化底盘frame id
 
-    //! 定时器, 使用EKF对状态进行更新
-    timer_ = nh_private.createTimer(ros::Duration(1.0/max(freq,1.0)), &OdomEstimationNode::spin, this);
+      //! 定时器, 周期触发使用EKF对状态进行更新
+      timer_ = nh_private.createTimer(ros::Duration(1.0 / max(freq, 1.0)), &OdomEstimationNode::spin, this);
 
-    // advertise our estimation
-    //! 输出结果主题
-    pose_pub_ = nh_private.advertise<geometry_msgs::PoseWithCovarianceStamped>("odom_combined", 10);
+      // advertise our estimation
+      //! 输出结果主题
+      pose_pub_ = nh_private.advertise<geometry_msgs::PoseWithCovarianceStamped>("odom_combined", 10);
 
-    // initialize
-    filter_stamp_ = Time::now();
+      // initialize
+      filter_stamp_ = Time::now();
 
-    // subscribe to odom messages
-    //! 订阅odom
-    if (odom_used_){
-      ROS_DEBUG("Odom sensor can be used");
-      odom_sub_ = nh.subscribe("odom", 10, &OdomEstimationNode::odomCallback, this);
-    }
-    else ROS_DEBUG("Odom sensor will NOT be used");
+      // subscribe to odom messages
+      //! 订阅odom
+      if (odom_used_)
+      {
+          ROS_DEBUG("Odom sensor can be used");
+          odom_sub_ = nh.subscribe("odom", 10, &OdomEstimationNode::odomCallback, this);
+      }
+      else
+          ROS_DEBUG("Odom sensor will NOT be used");
 
-    // subscribe to imu messages
-    //! 订阅imu
-    if (imu_used_){
-      ROS_DEBUG("Imu sensor can be used");
-      imu_sub_ = nh.subscribe("imu_data", 10,  &OdomEstimationNode::imuCallback, this);
-    }
-    else ROS_DEBUG("Imu sensor will NOT be used");
+      // subscribe to imu messages
+      //! 订阅imu
+      if (imu_used_)
+      {
+          ROS_DEBUG("Imu sensor can be used");
+          imu_sub_ = nh.subscribe("imu_data", 10, &OdomEstimationNode::imuCallback, this);
+      }
+      else
+          ROS_DEBUG("Imu sensor will NOT be used");
 
-    // subscribe to vo messages
-    //! 订阅vo
-    if (vo_used_){
-      ROS_DEBUG("VO sensor can be used");
-      vo_sub_ = nh.subscribe("vo", 10, &OdomEstimationNode::voCallback, this);
-    }
-    else ROS_DEBUG("VO sensor will NOT be used");
+      // subscribe to vo messages
+      //! 订阅vo
+      if (vo_used_)
+      {
+          ROS_DEBUG("VO sensor can be used");
+          vo_sub_ = nh.subscribe("vo", 10, &OdomEstimationNode::voCallback, this);
+      }
+      else
+          ROS_DEBUG("VO sensor will NOT be used");
 
-    //! 订阅gps
-    if (gps_used_){
-      ROS_DEBUG("GPS sensor can be used");
-      gps_sub_ = nh.subscribe("gps", 10, &OdomEstimationNode::gpsCallback, this);
-    }
-    else ROS_DEBUG("GPS sensor will NOT be used");
+      //! 订阅gps
+      if (gps_used_)
+      {
+          ROS_DEBUG("GPS sensor can be used");
+          gps_sub_ = nh.subscribe("gps", 10, &OdomEstimationNode::gpsCallback, this);
+      }
+      else
+          ROS_DEBUG("GPS sensor will NOT be used");
 
+      //! 订阅yaw
+      if (yaw_used_)
+      {
+          ROS_DEBUG("Yaw sensor can be used");
+          yaw_sub_ = nh.subscribe("yaw", 10, &OdomEstimationNode::yawCallback, this);
+      }
+      else
+      {
+          ROS_DEBUG("Yaw sensor will NOT be used");
+      }
 
     // publish state service
     state_srv_ = nh_private.advertiseService("get_status", &OdomEstimationNode::getStatus, this);
@@ -193,8 +218,8 @@ namespace estimation
     //! 设置odom传感器的协方差
     for (unsigned int i=0; i<6; i++)
       for (unsigned int j=0; j<6; j++)
-        odom_covariance_(i+1, j+1) = odom->pose.covariance[6*i+j];
-
+//        odom_covariance_(i+1, j+1) = odom->pose.covariance[6*i+j];
+        odom_covariance_(i+1, j+1) = 0.1;
     my_filter_.addMeasurement(StampedTransform(odom_meas_.inverse(), odom_stamp_, base_footprint_frame_, "wheelodom"), odom_covariance_);
     
     // activate odom
@@ -386,6 +411,56 @@ namespace estimation
   };
 
 
+  void OdomEstimationNode::yawCallback(const estimation::YawConstPtr &yaw)
+  {
+      yaw_callback_counter_++;
+
+      assert(yaw_used_);
+
+      // set current sensor stamp
+      yaw_stamp_ = yaw->header.stamp;
+      yaw_time_ = ros::Time::now();
+
+      // build tf::Transform data
+      geometry_msgs::Pose yaw_pose;
+      yaw_pose.position.x = 0.0;
+      yaw_pose.position.y = 0.0;
+      yaw_pose.position.z = 0.0;
+      double yaw_data = -yaw->twist.twist.angular.z * M_PI / 180.0 + M_PI_2;  // TODO: Change to right-hand coordination
+      yaw_pose.orientation = tf::createQuaternionMsgFromYaw(yaw_data);
+      tf::poseMsgToTF(yaw_pose, yaw_meas_);
+      // TODO: We give a fix variance of yaw
+      yaw_covariance_(1, 1) = 1e-2;
+
+      //! 如果设置yaw sensor不直接替换输出信息, 那么也会参与角度的融合
+      if (!yaw_split_)
+        my_filter_.addMeasurement(tf::StampedTransform(yaw_meas_.inverse(), yaw_stamp_, base_footprint_frame_, "yaw"), yaw_covariance_);
+
+      // activate yaw 处理传感器未激活的情况,
+      // 出现在程序开始运行或传感器失联超时后有重新连接上的情况
+      if (!yaw_active_)
+      {
+          // 初始化标志位: 传感器重置后第一次接收到数据
+          if (!yaw_initializing_)
+          {
+              yaw_initializing_ = true;
+              yaw_init_stamp_ = yaw_stamp_;
+              ROS_INFO("Initializing Yaw sensor");
+          }
+          // 传感器激活标志位: 初始化后传感器的数据被filter融合使用了, 因为可能filter融合的数据有延迟
+          if (filter_stamp_ >= yaw_init_stamp_)
+          {
+              yaw_active_ = true;
+              yaw_initializing_ = false;  // 初始化完成, 重置标志位
+              ROS_INFO("Yaw sensor activated");
+          }
+          else
+            ROS_INFO("Waiting to activate Yaw sensor, because Yaw measurements are still %f sec in the future",
+                     (yaw_init_stamp_ - filter_stamp_).toSec());
+      }
+  }
+
+
 
   // filter loop
   void OdomEstimationNode::spin(const ros::TimerEvent& e)
@@ -400,7 +475,8 @@ namespace estimation
     
     // initial value for filter stamp; keep this stamp when no sensors are active
     filter_stamp_ = Time::now();
-    
+
+    //! 检查每个使用的传感器失联是否超时
     // check which sensors are still active
     if ((odom_active_ || odom_initializing_) && 
         (Time::now() - odom_time_).toSec() > timeout_){
@@ -424,6 +500,14 @@ namespace estimation
       ROS_INFO("GPS sensor not active any more");
     }
 
+    if ((yaw_active_ || yaw_initializing_) &&
+        (Time::now() - yaw_time_).toSec() > timeout_)
+    {
+        yaw_active_ = false;
+        yaw_initializing_ = false;
+        ROS_INFO("Yaw sensor not active any more");
+    }
+
     
     // only update filter when one of the sensors is active
     if (odom_active_ || imu_active_ || vo_active_ || gps_active_){
@@ -433,23 +517,64 @@ namespace estimation
       if (imu_active_)   filter_stamp_ = min(filter_stamp_, imu_stamp_);
       if (vo_active_)    filter_stamp_ = min(filter_stamp_, vo_stamp_);
       if (gps_active_)  filter_stamp_ = min(filter_stamp_, gps_stamp_);
-
+      if (yaw_active_ || yaw_split_)  filter_stamp_ = min(filter_stamp_, yaw_stamp_);
       
       // update filter
       if ( my_filter_.isInitialized() )  {
         bool diagnostics = true;
+        //! 这里进行单次ekf更新
         if (my_filter_.update(odom_active_, imu_active_,gps_active_, vo_active_,  filter_stamp_, diagnostics)){
           
           // output most recent estimate and relative covariance
           my_filter_.getEstimate(output_);
+          //! 如果设置了yaw_split_标志位, 并且yaw sensor是可用的.
+          //! 那么yaw sensor的信息会直接替换掉output的旋转信息
+          if (yaw_split_ && (yaw_active_ || yaw_initializing_) )
+          {
+              geometry_msgs::Pose yaw_pose;
+              tf::poseTFToMsg(yaw_meas_, yaw_pose);
+              output_.pose.pose.orientation = yaw_pose.orientation;
+          }
+          output_.header.frame_id = global_frame_;  //! 这里替换坐标系到UTM全局
           pose_pub_.publish(output_);
           ekf_sent_counter_++;
-          
+
+          // initialize transform: world<--odom
+          if (ekf_sent_counter_ == 1)
+          {
+              my_filter_.getEstimate(ros::Time(), init_output_);
+              init_output_.frame_id_ = global_frame_;
+              init_output_.child_frame_id_ = output_frame_;
+
+          }
+          odom_broadcaster_.sendTransform( StampedTransform(init_output_, ros::Time::now(), global_frame_, output_frame_) );
+
           // broadcast most recent estimate to TransformArray
           StampedTransform tmp;
           my_filter_.getEstimate(ros::Time(), tmp);
           if(!vo_active_ && !gps_active_)
             tmp.getOrigin().setZ(0.0);
+          //! 和上面一样, 设置yaw_split_标志位, 并且yaw sensor可用,
+          //! tf树的旋转数据也会直接被yaw sensor测量替代
+          if (yaw_split_ && (yaw_active_ || yaw_initializing_) )
+          {
+              tmp.setRotation(yaw_meas_.getRotation());
+          }
+          try
+          {
+              tf::Stamped<tf::Pose> global_tf_pose, odom_tf_pose;
+              global_tf_pose.setData(tmp);
+              global_tf_pose.frame_id_ = global_frame_;
+              robot_state_.waitForTransform(global_frame_, output_frame_, ros::Time(0),ros::Duration(3));
+              robot_state_.transformPose(output_frame_, global_tf_pose, odom_tf_pose);
+              tmp.setData(odom_tf_pose);
+          }
+          catch(tf::TransformException &ex)
+          {
+            ROS_ERROR("%s",ex.what());
+            ros::Duration(1.0).sleep();
+            return;
+          }
           odom_broadcaster_.sendTransform(StampedTransform(tmp, tmp.stamp_, output_frame_, base_footprint_frame_));
           
           if (debug_){
@@ -526,6 +651,11 @@ bool OdomEstimationNode::getStatus(robot_pose_ekf::GetStatus::Request& req, robo
   ss << "   - is "; if (!gps_active_) ss << "NOT "; ss << "active" << endl;
   ss << "   - received " << gps_callback_counter_ << " messages" << endl;
   ss << "   - listens to topic " << gps_sub_.getTopic() << endl;
+  ss << " * Yaw sensor" << endl;
+  ss << "   - is "; if (!yaw_used_) ss << "NOT"; ss << "used" << endl;
+  ss << "   - is "; if (!yaw_active_) ss << "NOT"; ss << "used" << endl;
+  ss << "   - received" << yaw_callback_counter_ << "messages" << endl;
+  ss << "   - listens to topic " << yaw_sub_.getTopic() << endl;
   ss << "Output:" << endl;
   ss << " * Robot pose ekf filter" << endl;
   ss << "   - is "; if (!my_filter_.isInitialized()) ss << "NOT "; ss << "active" << endl;

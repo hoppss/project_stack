@@ -30,6 +30,8 @@
 #define MAX_MOTO_SPEED 1000 // 电机最大转速 / 串口输入速度最大数据
 #define LINEAR_SPEED_FACTOR 600
 #define ANGULAR_SPPED_FACTOR 500
+#define LINEAR_SPEED_RATE 1.33
+#define ANGULAR_SPEED_RATE 0.833
 #define VEL_X_COV
 #define VEL_YAW_COV
 
@@ -210,8 +212,8 @@ void NeuRobotDriver::sendSpeedCb(const ros::TimerEvent &)
 //    int right_wheel_w = 60 * MOTOR_RATE * (linear_vel - BASE_R * angular_vel) / (2 * M_PI * WHEEL_R);
 
     //! 线速度, 角速度控制
-    int left_wheel_w = LINEAR_SPEED_FACTOR * linear_vel;
-    int right_wheel_w = ANGULAR_SPPED_FACTOR * angular_vel;
+    int left_wheel_w = LINEAR_SPEED_FACTOR * LINEAR_SPEED_RATE * linear_vel;
+    int right_wheel_w = ANGULAR_SPPED_FACTOR * ANGULAR_SPEED_RATE * angular_vel;
 
     left_wheel_w = max(min(left_wheel_w, MAX_MOTO_SPEED), -MAX_MOTO_SPEED);
     right_wheel_w = -max(min(right_wheel_w, MAX_MOTO_SPEED), -MAX_MOTO_SPEED);

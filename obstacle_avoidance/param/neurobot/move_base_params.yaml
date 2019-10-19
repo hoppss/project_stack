@@ -1,11 +1,14 @@
 use_light: true
 controller_frequency: 20.0
-max_linear_vel: 0.2
-min_linear_vel: 0.05
-max_angular_vel: 0.5
-min_angular_vel: 0.05
+max_linear_vel: 0.05
+min_linear_vel: 0.01
+max_angular_vel: 0.1
+min_angular_vel: 0.01
 debug: true
 generate_path: true
-path_resolution: 0.05
+path_resolution: 0.5
 rw_time_thres: 1.0  # rolling window刷新的频率
 rw_dist_thres: 0.5  # 子目标点距离刷新rolling window的阈值
+rw_stop_thres: 0.1  # rolling window 扫描障碍物停止距离阈值
+use_global_delay: true
+global_delay_thres: 10

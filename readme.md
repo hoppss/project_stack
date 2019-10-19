@@ -12,14 +12,15 @@
 
 - 走廊中路控制: [coord_target_planner](./coord_target_planner); [coord_move_base](./coord_move_base/)
 
-- PC远程客户端: [MonitorPlatform](https://github.com/yhfeng1995/MonitorPlatform/)
+- PC远程客户端(暂不公开~): [MonitorPlatform](https://github.com/yhfeng1995/MonitorPlatform/)
 
 ## 2.2 室外移动机器人自主移动
 
-部分packages不是我写的, 因此项目不完整.
 
 - 金智达底盘驱动, 启动文件: [neurobot_description](./neurobot_description/); [neurobot_bringup](./neurobot_bringup/)
 
+- 手机偏航角接收程序: [nav_goal_lh](./nav_goal_lh)
+
 - 简单坐标系转换(odom->gps), EKF启动文件: [neurobot_data_proprocess](./neurobot_data_proprocess/)
 
-- 简单避障: [rolling_window](./rolling_window/); [obstacle_avoidance](./obstacle_avoidance/)
+- 未知环境下避障导航: [rolling_window](./rolling_window/); [obstacle_avoidance](./obstacle_avoidance/)

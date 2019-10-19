@@ -1,9 +1,9 @@
 <launch>
-    <arg name="play_bag" default="true" />
-    <arg name="use_rviz" default="true" />
+    <arg name="play_bag" default="false" />
+    <arg name="use_rviz" default="false" />
     <arg name="use_debug" default="true" />
     <arg name="bag_filename"
-         default="/home/yonghui/Datasets/neurobot/localization/2019-09-28/2019-09-28-10-35-29.bag" />
+         default="/home/yonghui/Datasets/neurobot/localization/2019-09-28/2019-10-08-16-11-52.bag" />
 
 
 
@@ -11,7 +11,7 @@
         <param name="global_frame" value="odom" />
         <param name="odom_frame" value="vo"/>
         <param name="wait_init_time" value="30"/>
-        <param name="use_debug" value="true"/>
+        <param name="use_debug" value="$(arg use_debug)"/>
 
         <remap from="odom_gps" to="/odom_gps" />
         <remap from="yaw_odom" to="/yaw_odom" />

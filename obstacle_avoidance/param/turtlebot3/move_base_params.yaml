@@ -9,3 +9,5 @@ generate_path: true
 path_resolution: 0.05
 rw_time_thres: 1.0  # rolling window刷新的频率
 rw_dist_thres: 0.5  # 子目标点距离刷新rolling window的阈值
+use_global_delay: true
+global_delay_thres: 30

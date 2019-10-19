@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 2.8.3)
 project(obstacle_avoidance)
 
 ## Compile as C++11, supported in ROS Kinetic and newer
-# add_compile_options(-std=c++11)
+add_compile_options(-std=c++11)
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall -g")
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -g")
 
@@ -18,10 +18,12 @@ find_package(catkin REQUIRED COMPONENTS
   std_msgs
   pluginlib
   actionlib
+  message_generation
   move_base_msgs
   nav_core
   costmap_2d
   base_local_planner
+  gps_common
   rolling_window
 )
 
@@ -66,11 +68,10 @@ find_package(catkin REQUIRED COMPONENTS
 # )
 
 ## Generate services in the 'srv' folder
-# add_service_files(
-#   FILES
-#   Service1.srv
-#   Service2.srv
-# )
+add_service_files(
+  FILES
+  TransformPoseStamped.srv
+)
 
 ## Generate actions in the 'action' folder
 # add_action_files(
@@ -80,10 +81,11 @@ find_package(catkin REQUIRED COMPONENTS
 # )
 
 ## Generate added messages and services with any dependencies listed here
-# generate_messages(
-#   DEPENDENCIES
-#   geometry_msgs#   nav_msgs#   sensor_msgs#   std_msgs
-# )
+generate_messages(
+  DEPENDENCIES
+  geometry_msgs
+  std_msgs
+)
 
 ################################################
 ## Declare ROS dynamic reconfigure parameters ##
@@ -138,6 +140,7 @@ add_library(${PROJECT_NAME}
   src/${PROJECT_NAME}/convertor.cpp
   src/${PROJECT_NAME}/nav_simulator.cpp
   src/${PROJECT_NAME}/move_base_obstacle.cpp
+  src/${PROJECT_NAME}/obstacle_avoidance_client.cpp
 )
 
 target_link_libraries(${PROJECT_NAME}
@@ -154,7 +157,8 @@ add_dependencies(${PROJECT_NAME} ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EX
 ## The recommended prefix ensures that target names across packages don't collide
 #add_executable(${PROJECT_NAME}_node src/${PROJECT_NAME}_node.cpp)
 add_executable(simple_obstacle_stop_node src/simple_obstacle_stop.cpp)
-add_executable(obstacle_avoidance_node src/obstacle_avoidance_node.cpp)
+add_executable(obstacle_avoidance_server_node src/obstacle_avoidance_server_node.cpp)
+add_executable(obstacle_avoidance_client_node src/obstacle_avoidance_client_node.cpp)
 
 ## Rename C++ executable without prefix
 ## The above recommended prefix causes long target names, the following renames the
@@ -174,7 +178,11 @@ target_link_libraries(simple_obstacle_stop_node
     ${catkin_LIBRARIES}
 )
 
-target_link_libraries(obstacle_avoidance_node
+target_link_libraries(obstacle_avoidance_server_node
+    ${PROJECT_NAME}
+)
+
+target_link_libraries(obstacle_avoidance_client_node
     ${PROJECT_NAME}
 )
 

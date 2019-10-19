@@ -43,8 +43,11 @@ namespace obstacle_avoidance
         gp_pub_ = nh_.advertise<nav_msgs::Path>("global_path", 1);
         gp_sub_ = nh_.subscribe<nav_msgs::Path>("global_path", 1, &MoveBaseObstacle::globalPathCb, this);
 
+        // transform pose
+        trans_srv_ = private_nh_.advertiseService("transform_posestamped", &MoveBaseObstacle::transformPoseStampedCb, this);
+
         //! local costmap
-        private_nh_.param("local_costmap/gloabl_frame", global_frame_, std::string("world"));
+        private_nh_.param("local_costmap/global_frame", global_frame_, std::string("world"));
         private_nh_.param("local_costmap/robot_base_frame", robot_base_frame_, std::string("base_link"));
         local_costmap_ = new costmap_2d::Costmap2DROS("local_costmap", tf_);
         local_costmap_->pause();
@@ -67,7 +70,12 @@ namespace obstacle_avoidance
         //! rolling window
         private_nh_.param("rw_time_thres", rw_time_thres_, 1.0);
         private_nh_.param("rw_dist_thres", rw_dist_thres_, 0.5);
+        private_nh_.param("rw_stop_thres", rw_stop_thres_, 0.1);
         rw_ = new rolling_window::RollingWindow(tf_, "rolling_window");
+
+        //! global no obstacle delay
+        private_nh_.param("use_global_delay", use_global_delay_, true);
+        private_nh_.param("global_delay_thres", global_delay_thres_, 10);
 
         //! start action server
         as_->start();
@@ -88,6 +96,32 @@ namespace obstacle_avoidance
     }
 
 
+    bool MoveBaseObstacle::transformPoseStampedCb(TransformPoseStamped::Request &req,
+                                                  TransformPoseStamped::Response &res)
+    {
+//        ROS_WARN("Transform service has been called. To frame_id: %s", req.target_frame.c_str());
+        return rw_->getTargetFramePose(req.input_pose, res.output_pose, req.target_frame);
+    }
+
+
+    bool MoveBaseObstacle::getRobotPoseRollingWindow(tf::Stamped<tf::Pose> &robot_pose)
+    {
+        geometry_msgs::PoseStamped robot_pose_msg, base_pose_msg;
+        tf::Stamped<tf::Pose> base_pose;
+        base_pose.setIdentity();
+        tf::poseStampedTFToMsg(base_pose, base_pose_msg);
+        base_pose_msg.header.stamp = ros::Time::now();
+        base_pose_msg.header.frame_id = robot_base_frame_;
+        if (!rw_->getGlobalFramePose(base_pose_msg, robot_pose_msg))
+        {
+            ROS_ERROR("Global robot pose transform fail.");
+            return false;
+        }
+        tf::poseStampedMsgToTF(robot_pose_msg, robot_pose);
+        return true;
+    }
+
+
     /**
      * @brief 发布停车速度
      */
@@ -97,6 +131,7 @@ namespace obstacle_avoidance
         cmd_vel.linear.y = 0.0;
         cmd_vel.angular.z = 0.0;
         vel_pub_.publish(cmd_vel);
+        last_cmd_vel_ = cmd_vel;
     }
 
 
@@ -136,15 +171,17 @@ namespace obstacle_avoidance
         // 步进较大的维度使用path_resolution作为步长
         double step_x = norm_dx < norm_dy ? dx/(norm_dy+1e-4)*path_resolution_ : dx/norm_dx*path_resolution_;
         double step_y = norm_dy < norm_dx ? dy/(norm_dx+1e-4)*path_resolution_ : dy/norm_dy*path_resolution_;
-        ROS_DEBUG_STREAM("Cacluate global path: step_x=" << step_x << ", step_y=" << step_y);
+        ROS_DEBUG_STREAM("Calculate global path: step_x=" << step_x << ", step_y=" << step_y);
         // 遍历直线路径上的点 (不带start, 带end)
         double num_step = floor(dx / step_x);  // 根据x方向遍历
         double curr_x = start_pose.pose.position.x;
         double curr_y = start_pose.pose.position.y;
+        ROS_DEBUG_STREAM("Calculate global path number step=" << num_step);
         for (int i=0; i<num_step; i++)
         {
             curr_x += step_x;
             curr_y += step_y;
+//            ROS_DEBUG("[%f, %f]", curr_x, curr_y);
             geometry_msgs::PoseStamped pose_msgs;
             pose_msgs.header.stamp = t;
             pose_msgs.header.frame_id = global_frame_;
@@ -271,7 +308,8 @@ namespace obstacle_avoidance
      */
     bool MoveBaseObstacle::goalToGlobalFrame(const geometry_msgs::PoseStamped &goal_pose_msg, geometry_msgs::PoseStamped &global_pose_msg)
     {
-        tf::Stamped<tf::Pose> goal_pose, global_pose;
+        tf::Stamped<tf::Pose> goal_pose;
+        tf::Stamped<tf::Pose> global_pose = goal_pose;
         poseStampedMsgToTF(goal_pose_msg, goal_pose);  // 转换到tf::Stamped<tf::Pose>格式
 
         //just get the latest available transform... for accuracy they should send
@@ -290,6 +328,9 @@ namespace obstacle_avoidance
         }
 
         tf::poseStampedTFToMsg(global_pose, global_pose_msg);  // 再从tf::Stamped<tf::Pose>转换到geometry_msgs::PoseStamped
+
+        ROS_WARN("Before transform stamp: %f", goal_pose_msg.header.stamp.toSec());
+        ROS_WARN("After transform stamp: %f", global_pose_msg.header.stamp.toSec());
         return true;
     }
 
@@ -308,9 +349,14 @@ namespace obstacle_avoidance
             as_->setAborted(move_base_msgs::MoveBaseResult(), "Aborting on goal because it was sent with an invalid quaternion");
             return false;
         }
+//        if (move_base_goal.target_pose.header.frame_id == global_frame_)
+//            return true;
         //! 转换到全局坐标系, 发布到current_goal
 //        geometry_msgs::PoseStamped goal;
-        if (!goalToGlobalFrame(move_base_goal.target_pose, goal))
+//        if (!goalToGlobalFrame(move_base_goal.target_pose, goal))
+        geometry_msgs::PoseStamped source_pose = move_base_goal.target_pose;
+        source_pose.header.stamp = ros::Time::now();
+        if (!rw_->getGlobalFramePose(source_pose, goal))
         {
             as_->setAborted(move_base_msgs::MoveBaseResult(), "Aborting on goal because fail goal frame transform");
             return false;
@@ -319,6 +365,10 @@ namespace obstacle_avoidance
 //        current_goal_pub_.publish(current_goal_);  // -> /move_base/current_goal
         current_goal_pub_.publish(goal);  // -> /move_base/current_goal
         tf::poseStampedMsgToTF(goal, current_goal_);
+        ROS_WARN("Current_goal: frame_id=%s, x=%7.4f, y=%7.4f",
+                goal.header.frame_id.c_str(),
+                goal.pose.position.x,
+                goal.pose.position.y);
         return true;
     }
 
@@ -334,6 +384,14 @@ namespace obstacle_avoidance
     {
         double diff_x = global_goal_pose.getOrigin().x() - global_robot_pose.getOrigin().x();
         double diff_y = global_goal_pose.getOrigin().y() - global_robot_pose.getOrigin().y();
+//        ROS_WARN("goal_x=%7.4f, robot_x=%7.4f, diff_x=%7.4f",
+//                global_goal_pose.getOrigin().x(),
+//                global_robot_pose.getOrigin().x(),
+//                diff_x);
+//        ROS_WARN("goal_y=%7.4f, robot_y=%7.4f, diff_y=%7.4f",
+//                 global_goal_pose.getOrigin().y(),
+//                global_robot_pose.getOrigin().y(),
+//                diff_y);
         double goal_angle = atan2(diff_y, diff_x);  // (-pi, pi)
         double robot_angle = Convertor::getYaw(global_robot_pose);
         double angle =  goal_angle - robot_angle;
@@ -367,7 +425,8 @@ namespace obstacle_avoidance
         //! 没有外部程序发布global_plan主题时, 自己生成主题并发布
         if (is_generate_path_)
         {
-            if (!local_costmap_->getRobotPose(global_robot_pose_))  // TODO: 使用local costmap, 需要使用其他方法获得机器人位置
+            if (!local_costmap_->getRobotPose(global_robot_pose_))  // TODO: 使用local costmap定位
+//            if (getRobotPoseRollingWindow(global_robot_pose_))  // TODO: 使用rolling window定位
             {
                 ROS_WARN("Fail to get goal direction: Get robot glabal pose fail.");
                 resetState();
@@ -404,6 +463,7 @@ namespace obstacle_avoidance
             resetState();
             return;
         }
+        ROS_ERROR_STREAM("Global goal stamp: " << goal_msg.header.stamp.toSec());
 
         ROS_DEBUG("Receive goal message successfully!");
         //! 开始循环执行action server callback循环
@@ -444,7 +504,8 @@ namespace obstacle_avoidance
                 goal_init_ = false;  // 对于一个目标点, 初始化只需要一次
 
                 //! 获得底盘开始位姿
-                if (!local_costmap_->getRobotPose(global_robot_pose_))  // TODO: 使用local costmap, 需要使用其他方法获得机器人位置
+                if (!local_costmap_->getRobotPose(global_robot_pose_))  // TODO: 使用local costmap定位
+//                if (!getRobotPoseRollingWindow(global_robot_pose_))  // TODO: 使用local costmap定位
                 {
                     ROS_WARN("Fail to get goal direction: Get robot glabal pose fail.");
                     resetState();
@@ -457,7 +518,9 @@ namespace obstacle_avoidance
                 double last_angle = Convertor::getYaw(global_robot_pose_);
                 double turn_angle = 0.0;
                 bool turn_flag = true;
-                while (nh_.ok() && turn_flag && local_costmap_->getRobotPose(global_robot_pose_))
+
+                while (nh_.ok() && turn_flag && local_costmap_->getRobotPose(global_robot_pose_))  // TODO: 使用local costmap定位
+//                while (nh_.ok() && turn_flag && getRobotPoseRollingWindow(global_robot_pose_))  // TODO: 使用local costmap定位
                 {
                     // 旋转积分
                     double current_angle = Convertor::getYaw(global_robot_pose_);
@@ -497,13 +560,21 @@ namespace obstacle_avoidance
                 ROS_DEBUG("Call rolling window to find a new local goal");
                 // 初始化求解第一个子目标点
                 rw_->solveLocalGoal(local_goal_msg_);
-                ROS_DEBUG_STREAM("Start pose: x=" << global_robot_pose_.getOrigin().x() << ", y=" << global_robot_pose_.getOrigin().y());
-                ROS_DEBUG_STREAM("Local goal: x=" << local_goal_msg_.pose.position.x << ", y=" << local_goal_msg_.pose.position.y);
+//                ROS_DEBUG_STREAM("Start pose: x=" << global_robot_pose_.getOrigin().x() << ", y=" << global_robot_pose_.getOrigin().y());
+//                ROS_DEBUG_STREAM("Local goal: x=" << local_goal_msg_.pose.position.x << ", y=" << local_goal_msg_.pose.position.y);
                 // 重置计数器
                 makeplan_timer_.tic();
                 // 更新控制器每次local control的时候都会更新global path
                 geometry_msgs::PoseStamped global_pose;
                 tf::poseStampedTFToMsg(global_robot_pose_, global_pose);
+                ROS_DEBUG("Start pose: frame_id=%12s, x=%9.4f, y=%9.4f",
+                        global_pose.header.frame_id.c_str(),
+                        global_pose.pose.position.x,
+                        global_pose.pose.position.y);
+                ROS_DEBUG("Local goal: frame_id=%12s, x=%9.4f, y=%9.4f",
+                        local_goal_msg_.header.frame_id.c_str(),
+                        local_goal_msg_.pose.position.x,
+                        local_goal_msg_.pose.position.y);
                 std::vector<geometry_msgs::PoseStamped> current_path;
                 generatePath(global_pose, local_goal_msg_, current_path);
 
@@ -520,7 +591,8 @@ namespace obstacle_avoidance
             //! 路径控制
             else
             {
-                if (!local_costmap_->getRobotPose(global_robot_pose_))  // TODO: 使用local costmap, 需要使用其他方法获得机器人位置
+                if (!local_costmap_->getRobotPose(global_robot_pose_))  // TODO: 使用local costmap定位
+//                if (!getRobotPoseRollingWindow(global_robot_pose_))  // TODO: 使用local costmap定位
                 {
                     ROS_WARN("Fail to get goal direction: Get robot glabal pose fail.");
                     resetState();
@@ -579,20 +651,60 @@ namespace obstacle_avoidance
                     current_goal_.getOrigin().y() - local_goal_msg_.pose.position.y
                     );
             vector<geometry_msgs::PoseStamped > current_path;
-            if (fail_cnt_ > 0 ||  // 有local plan连续失败控制的记录, 重新进行一次rolling window
-                makeplan_timer_.toc() > rw_time_thres_ ||  // 超过一定时间, 重新进行一次rolling window
-                ( local_goal_dist < rw_dist_thres_ && local_global_dist > 1e-3)  // 距离子目标距离小于一定距离, 重新进行一次rolling window, 但当子目标就是全局目标的时候, 不再重新更新
-            )
-//            if (local_goal_dist < rw_dist_thres_)  // 距离子目标距离小于一定距离, 重新进行一次rolling window, 但当子目标就是全局目标的时候, 不再重新更新
+
+            //! 进行rolling window刷新的判断条件
+            // 1. 有local plan连续失败控制的记录, 重新进行一次rolling window
+            // 2. 超过一定时间, 重新进行一次rolling window
+            // 3. 距离子目标距离小于一定距离, 重新进行一次rolling window, 但当子目标就是全局目标的时候, 不再重新更新
+            // 4. 如果启用global delay, 当处于连续global goal计数时, 会一直保持刷新
+            bool activate_rw =
+                    fail_cnt_ > 0 ||
+                    makeplan_timer_.toc() > rw_time_thres_ ||
+                    ( local_goal_dist < rw_dist_thres_ && local_global_dist > 1e-3) ||
+                    ( use_global_delay_ && global_delay_cnt_ > 0 && global_delay_cnt_ < global_delay_thres_);
+            if (activate_rw)
             {
                 ROS_DEBUG("Call rolling window to find a new local goal");
-                rw_->solveLocalGoal(local_goal_msg_);
-                ROS_DEBUG_STREAM("Start pose: x=" << global_robot_pose_.getOrigin().x() << ", y=" << global_robot_pose_.getOrigin().y());
-                ROS_DEBUG_STREAM("Local goal: x=" << local_goal_msg_.pose.position.x << ", y=" << local_goal_msg_.pose.position.y);
+                last_local_goal_ = local_goal_msg_;
+                bool is_global = rw_->solveLocalGoal(local_goal_msg_);  // 这里是求解local goal的接口
+//                ROS_DEBUG_STREAM("Start pose: x=" << global_robot_pose_.getOrigin().x() << ", y=" << global_robot_pose_.getOrigin().y());
+//                ROS_DEBUG_STREAM("Local goal: x=" << local_goal_msg_.pose.position.x << ", y=" << local_goal_msg_.pose.position.y);
                 makeplan_timer_.tic();
+
+                //! global delay, 如果没有达到连续global goal的阈值, 继续向原子目标点移动
+                if (use_global_delay_ && is_global)
+                {
+                    global_delay_cnt_++;
+                    // 已经到达子目标点, 可以向global goal控制
+                    if (local_goal_dist < rw_dist_thres_)
+                    {
+                        ROS_ERROR("Close to local goal, do not need global delay");
+                        global_delay_cnt_ = global_delay_thres_+1;
+                    }
+                    // 没有达到设定的global delay时, 继续向之前的子目标点控制
+                    if (global_delay_cnt_ < global_delay_thres_)
+                    {
+                        local_goal_msg_ = last_local_goal_;
+                        ROS_ERROR("Activate global delay: %2d", global_delay_cnt_);
+                    }
+                }
+                else if (use_global_delay_ && global_delay_cnt_!=0)
+                {
+                    global_delay_cnt_ = 0;
+                    ROS_ERROR("Find new obstacle, clear global delay counter.");
+                }
+
                 //! 更新控制器每次local control的时候都会更新global path
                 geometry_msgs::PoseStamped global_pose;
                 tf::poseStampedTFToMsg(global_robot_pose_, global_pose);
+                ROS_DEBUG("Start pose: frame_id=%12s, x=%9.4f, y=%9.4f",
+                          global_pose.header.frame_id.c_str(),
+                          global_pose.pose.position.x,
+                          global_pose.pose.position.y);
+                ROS_DEBUG("Local goal: frame_id=%12s, x=%9.4f, y=%9.4f",
+                          local_goal_msg_.header.frame_id.c_str(),
+                          local_goal_msg_.pose.position.x,
+                          local_goal_msg_.pose.position.y);
                 generatePath(global_pose, local_goal_msg_, current_path);
 
                 // update global path of local controller
@@ -604,29 +716,45 @@ namespace obstacle_avoidance
                     as_->setAborted(move_base_msgs::MoveBaseResult(), "Fail to pass global path to the local controller");
                     return true;
                 }
+
+//                //! 障碍物靠太近直接停下来
+//                if (rw_->obstacleMinDist() < rw_stop_thres_)
+//                {
+//                    publishZeroVelocity();
+//                    ROS_WARN("Obstacle is too close to the robot!");
+//                    fail_cnt_++;
+//                    sleep(1);
+//                    return false;
+//                }
             }
 
             //! local planner规划出速度
             geometry_msgs::Twist cmd_vel;
             if (local_planner_->computeVelocityCommands(cmd_vel))
             {
+//                // 如果处于global delay的阶段, 保持global delay开始的速度
+//                if (use_global_delay_ && global_delay_cnt_ > 0 && global_delay_cnt_ < global_delay_thres_)
+//                    cmd_vel = last_cmd_vel_;
                 ROS_DEBUG_NAMED( "move_base", "Got a valid command from the local planner: %.3lf, %.3lf, %.3lf",
                                  cmd_vel.linear.x, cmd_vel.linear.y, cmd_vel.angular.z );
                 vel_pub_.publish(cmd_vel);
+                last_cmd_vel_= cmd_vel;
                 fail_cnt_ = 0;
                 return false;
             }
             else
             {
-                // TODO: recovery?
+                // TODO: recovery实现
+                //  1. DWA控制失败的处理方案
+                //  2. ORB-SLAM2跟丢的处理方案
                 fail_cnt_++;
                 ROS_WARN("Continuous local planner control fail times: %02d\n", fail_cnt_);
-                if (fail_cnt_ > 10)
+                if (fail_cnt_ > 10)  // 连续控制10次失败才算真的失败
                 {
-                ROS_ERROR("Local controller cannot get a valid plan, aborting.");
-                resetState();
-                as_->setAborted(move_base_msgs::MoveBaseResult(), "Local planner fail to get a valid plan");
-                return true;
+                    ROS_ERROR("Local controller cannot get a valid plan, aborting.");
+                    resetState();
+                    as_->setAborted(move_base_msgs::MoveBaseResult(), "Local planner fail to get a valid plan");
+                    return true;
                 }
                 return false;
             }

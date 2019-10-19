@@ -31,7 +31,7 @@
     </group>
 
     <group if="$(arg use_rviz)">
-        <node pkg="rviz" type="rviz" name="rviz" args="-d $(find neurobot_data_proprocess)/rviz/gps2odom.rviz" />
+        <node pkg="rviz" type="rviz" name="rviz" args="-d $(find neurobot_data_proprocess)/rviz/odom2gps.rviz" />
     </group>
 
     <!--    <node pkg="data_visualization" type="data_visualization_node" name="data_visualization" />-->
