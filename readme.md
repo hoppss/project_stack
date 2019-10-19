@@ -24,3 +24,7 @@
 - 简单坐标系转换(odom->gps), EKF启动文件: [neurobot_data_proprocess](./neurobot_data_proprocess/)
 
 - 未知环境下避障导航: [rolling_window](./rolling_window/); [obstacle_avoidance](./obstacle_avoidance/)
+
+# 3. 更新记录
+
+- 0.1.0: 第一个release版本, 更新了neurobot基本的定位, 导航点遍历, 静态/低动态避障功能.
