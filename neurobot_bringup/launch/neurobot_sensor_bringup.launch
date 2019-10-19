@@ -1,0 +1,13 @@
+<launch>
+    <include file="$(find neurobot_bringup)/launch/neurobot_bringup.launch" >
+    </include>
+
+    <include file="$(find urg_node)/launch/urg_lidar.launch" >
+    </include>
+
+    <include file="$(find gps_common)/launch/gps_translate.launch" >
+    </include>
+
+    <node pkg="nav_goal_lh" type="current_yaw_node.py" name="current_yaw_node" >
+    </node>
+</launch>
